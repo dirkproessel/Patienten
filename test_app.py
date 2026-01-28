@@ -12,3 +12,12 @@ def test_home_page(client):
     response = client.get('/')
     assert response.status_code == 200
     assert b"Willkommen" in response.data
+
+def test_patients_page(client):
+    """Test that the patients page loads and displays fallback data (since no DB config)."""
+    response = client.get('/Patienten')
+    assert response.status_code == 200
+    assert b"Patientenliste" in response.data
+    # Check for fallback data names
+    assert b"Peter" in response.data
+    assert b"Claudia" in response.data

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patientenliste</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        function toggleSelection(element) {
+            // Toggle between gray (default) and blue (selected)
+            element.classList.toggle('bg-gray-200');
+            element.classList.toggle('bg-blue-500');
+            element.classList.toggle('text-white'); // Optional: make text white on blue background for better contrast
+        }
+    </script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-md">
+        <h1 class="text-2xl font-bold mb-6 text-gray-800">Patientenliste</h1>
+        <div class="space-y-4">
+            {% for patient in patients %}
+            <div
+                class="p-4 bg-gray-200 rounded-md cursor-pointer transition-colors duration-200 select-none"
+                onclick="toggleSelection(this)"
+            >
+                <span class="text-lg font-medium">{{ patient.name }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% if not patients %}
+            <p class="text-gray-500">Keine Patienten gefunden.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
