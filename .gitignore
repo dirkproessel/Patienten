@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+*.log
+flask_pid.txt
+.pytest_cache/
