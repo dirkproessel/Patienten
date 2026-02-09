@@ -5,14 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Patientenliste</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        function toggleSelection(element) {
-            // Toggle between gray (default) and blue (selected)
-            element.classList.toggle('bg-gray-200');
-            element.classList.toggle('bg-blue-500');
-            element.classList.toggle('text-white'); // Optional: make text white on blue background for better contrast
+    <style>
+        .no-select {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
         }
-    </script>
+    </style>
 </head>
 <body class="bg-gray-100 p-8">
     <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-md">
@@ -20,10 +22,11 @@
         <div class="space-y-4">
             {% for patient in patients %}
             <div
-                class="p-4 bg-gray-200 rounded-md cursor-pointer transition-colors duration-200 select-none"
-                onclick="toggleSelection(this)"
+                class="patient-item p-4 bg-gray-200 rounded-md cursor-pointer transition-all duration-200 no-select relative overflow-hidden"
+                data-patient-id="{{ patient.id }}"
+                data-patient-name="{{ patient.name }}"
             >
-                <span class="text-lg font-medium">{{ patient.name }}</span>
+                <span class="text-lg font-medium pointer-events-none">{{ patient.name }}</span>
             </div>
             {% endfor %}
         </div>
@@ -31,5 +34,157 @@
             <p class="text-gray-500">Keine Patienten gefunden.</p>
         {% endif %}
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const items = document.querySelectorAll('.patient-item');
+
+            items.forEach(item => {
+                let timer;
+                let isLongPress = false;
+                let startX, startY;
+                let isTouch = false;
+
+                const patientId = item.dataset.patientId;
+
+                const resetStyles = () => {
+                    item.classList.remove('scale-95');
+                    item.classList.remove('bg-blue-500', 'text-white'); // Einzelstunde feedback
+                    item.classList.remove('bg-purple-500', 'text-white', 'ring-4', 'ring-purple-300'); // B-Stunde feedback
+                    item.classList.add('bg-gray-200'); // Default
+                    // item.classList.remove('text-white'); // Keep text color managed by classes above
+                    // Actually, removing text-white reverts to default text color if it was set by Tailwind default (black/gray)
+                    // But we should ensure we don't leave residual classes.
+                };
+
+                const startPress = (e) => {
+                    if (e.type === 'touchstart') isTouch = true;
+                    if (e.type === 'mousedown' && isTouch) return;
+                    if (e.type === 'mousedown' && e.button !== 0) return; // Only left click
+
+                    isLongPress = false;
+
+                    if (e.type === 'touchstart') {
+                        startX = e.touches[0].clientX;
+                        startY = e.touches[0].clientY;
+                    }
+
+                    // Visual feedback: small scale down
+                    item.classList.add('scale-95');
+
+                    timer = setTimeout(() => {
+                        isLongPress = true;
+                        // Long Press Feedback (B-Stunde)
+                        item.classList.remove('bg-gray-200');
+                        item.classList.add('bg-purple-500', 'text-white', 'ring-4', 'ring-purple-300');
+                    }, 500); // 500ms for long press
+                };
+
+                const endPress = (e) => {
+                    if (e.type === 'mousedown' && isTouch) return;
+
+                    // Prevent default to avoid double firing or other issues?
+                    // if (e.cancelable) e.preventDefault();
+
+                    clearTimeout(timer);
+
+                    // Only process if we were pressing (sometimes mouseup happens without mousedown on the element if dragged in)
+                    // But we added listeners to the item, so it should be fine.
+
+                    if (isLongPress) {
+                        // Action: B-Stunde
+                        // Already visually indicated
+                        logSession(patientId, 'B-Stunde');
+
+                        // Keep the B-Stunde style for a moment
+                        setTimeout(() => {
+                            resetStyles();
+                        }, 1000);
+                    } else {
+                        // Action: Einzelstunde
+                        // We need to check if we should process it (e.g. wasn't cancelled)
+                        // But cancelPress handles cancellation. So if we are here, it's a valid tap.
+
+                        // Wait, if we cancelled, isLongPress is false, but timer is cleared.
+                        // We need to know if we are in a valid state.
+                        // We can check if 'scale-95' is present? No, cancel removes it.
+                        // But 'endPress' fires on mouseup. If we moved out, 'mouseleave' fired 'cancelPress'.
+                        // Does 'mouseup' still fire on the element if we moved out?
+                        // Generally no, unless we dragged back in?
+                        // If we drag out, mouseleave fires.
+
+                        // One edge case: touchmove cancels, then touchend fires.
+                        // We need a flag 'isPressing'.
+                        if (item.classList.contains('scale-95') || isLongPress) {
+                             // Valid press release
+                             if (!isLongPress) {
+                                 logSession(patientId, 'Einzelstunde');
+                                 // Visual feedback for Einzelstunde
+                                 item.classList.remove('bg-gray-200');
+                                 item.classList.add('bg-blue-500', 'text-white');
+
+                                 setTimeout(() => {
+                                     resetStyles();
+                                 }, 1000);
+                             }
+                        }
+                    }
+
+                    item.classList.remove('scale-95'); // Ensure scale is reset
+                    isLongPress = false;
+                };
+
+                const cancelPress = (e) => {
+                    if (e.type === 'mousedown' && isTouch) return;
+
+                    clearTimeout(timer);
+                    isLongPress = false;
+                    resetStyles();
+                };
+
+                const movePress = (e) => {
+                    if (e.type === 'touchmove') {
+                        const moveX = e.touches[0].clientX;
+                        const moveY = e.touches[0].clientY;
+                        if (Math.abs(moveX - startX) > 10 || Math.abs(moveY - startY) > 10) {
+                            cancelPress(e);
+                        }
+                    }
+                };
+
+                item.addEventListener('mousedown', startPress);
+                item.addEventListener('touchstart', startPress, {passive: true});
+
+                item.addEventListener('mouseup', endPress);
+                item.addEventListener('touchend', endPress);
+
+                item.addEventListener('mouseleave', cancelPress);
+                item.addEventListener('touchcancel', cancelPress);
+                item.addEventListener('touchmove', movePress, {passive: true});
+            });
+        });
+
+        async function logSession(patientId, type) {
+            console.log(`Logging ${type} for patient ${patientId}`);
+            try {
+                const response = await fetch('/log_session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ patient_id: patientId, type: type })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    console.log('Success:', result);
+                } else {
+                    console.error('Error:', result.error);
+                }
+            } catch (error) {
+                console.error('Network Error:', error);
+            }
+        }
+    </script>
 </body>
 </html>

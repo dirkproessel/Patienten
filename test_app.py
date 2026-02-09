@@ -21,3 +21,12 @@ def test_patients_page(client):
     # Check for fallback data names
     assert b"Peter" in response.data
     assert b"Claudia" in response.data
+
+def test_log_session_endpoint(client):
+    """Test that the log_session endpoint accepts POST requests."""
+    response = client.post('/log_session', json={
+        'patient_id': '123',
+        'type': 'Einzelstunde'
+    })
+    assert response.status_code == 200
+    assert response.json['success'] is True
