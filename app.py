@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template
+from flask import Flask, render_template, request, jsonify
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -46,6 +46,30 @@ def patients():
     # The requirement says "fetch all patients".
 
     return render_template('patients.html', patients=data)
+
+@app.route('/log_session', methods=['POST'])
+def log_session():
+    data = request.json
+    patient_id = data.get('patient_id')
+    appointment_type = data.get('type')
+
+    if not patient_id or not appointment_type:
+        return jsonify({'error': 'Missing data'}), 400
+
+    if supabase:
+        try:
+            supabase.table('appointments').insert({
+                'patient_id': patient_id,
+                'type': appointment_type
+            }).execute()
+            return jsonify({'success': True}), 200
+        except Exception as e:
+            print(f"Error logging session: {e}")
+            return jsonify({'error': str(e)}), 500
+    else:
+        # Fallback/Mock behavior if Supabase is not configured
+        print(f"Mock Log: Patient {patient_id}, Type {appointment_type}")
+        return jsonify({'success': True, 'mock': True}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
